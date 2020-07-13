@@ -1,9 +1,14 @@
 package com.example.maps_srinathsuddala_c0741052;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.location.Address;
 import android.location.Criteria;
 import android.location.Geocoder;
@@ -11,21 +16,32 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.DrawableRes;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.util.MapUtils;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -43,17 +59,17 @@ import java.util.Locale;
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener, GoogleMap.OnMapClickListener, GoogleMap.OnMapLongClickListener, GoogleMap.OnInfoWindowLongClickListener, GoogleMap.OnPolylineClickListener, GoogleMap.OnPolygonClickListener {
+        LocationListener, GoogleMap.OnMapClickListener, GoogleMap.OnMapLongClickListener, GoogleMap.OnInfoWindowLongClickListener, GoogleMap.OnPolylineClickListener, GoogleMap.OnPolygonClickListener, GoogleMap.OnMarkerDragListener {
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
     GoogleApiClient mGoogleApiClient;
     Location mLastLocation;
-    Marker mCurrLocationMarker;
     LocationRequest mLocationRequest;
     private GoogleMap mMap;
     private ArrayList<LatLng> latLngs;
-    private ArrayList<PolylineOptions> polylineOptions;
+    private ArrayList<Polyline> polylines;
     private String[] title = {"A", "B", "C", "D"};
     private Geocoder geocoder;
+    private int markerPosition, polyLinePosition;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,12 +105,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             buildGoogleApiClient();
             mMap.setMyLocationEnabled(true);
         }
+        polylines = new ArrayList<>();
         latLngs = new ArrayList<>();
-        polylineOptions = new ArrayList<>();
         mMap.setOnMapClickListener(this);
         mMap.setOnMapLongClickListener(this);
         mMap.setOnPolylineClickListener(this);
         mMap.setOnPolygonClickListener(this);
+        mMap.setOnMarkerDragListener(this);
         mMap.setOnInfoWindowLongClickListener(this);
     }
 
@@ -124,16 +141,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onConnectionSuspended(int i) {
     }
+
     @Override
     public void onLocationChanged(Location location) {
         mLastLocation = location;
-        if (mCurrLocationMarker != null) {
-            mCurrLocationMarker.remove();
-        }
-//Showing Current Location Marker on Map
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-        MarkerOptions markerOptions = new MarkerOptions();
-        markerOptions.position(latLng);
         LocationManager locationManager = (LocationManager)
                 getSystemService(Context.LOCATION_SERVICE);
         String provider = locationManager.getBestProvider(new Criteria(), true);
@@ -146,32 +158,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Location locations = locationManager.getLastKnownLocation(provider);
         List<String> providerList = locationManager.getAllProviders();
         if (null != locations && null != providerList && providerList.size() > 0) {
-            double longitude = locations.getLongitude();
-            double latitude = locations.getLatitude();
             geocoder = new Geocoder(getApplicationContext(),
                     Locale.getDefault());
-//            try {
-//                List<Address> listAddresses = geocoder.getFromLocation(latitude,
-//                        longitude, 1);
-//                if (null != listAddresses && listAddresses.size() > 0) {
-//                    String state = listAddresses.get(0).getAdminArea();
-//                    String country = listAddresses.get(0).getCountryName();
-//                    String subLocality = listAddresses.get(0).getSubLocality();
-//                    markerOptions.title("" + latLng + "," + subLocality + "," + state
-//                            + "," + country);
-//                }
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
         }
-//        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
-//        mCurrLocationMarker = mMap.addMarker(markerOptions);
-//        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-//        mMap.animateCamera(CameraUpdateFactory.zoomTo(11));
-//        if (mGoogleApiClient != null) {
-//            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient,
-//                    this);
-//        }
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(11));
     }
 
     @Override
@@ -246,23 +237,61 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onPolylineClick(Polyline polyline) {
         double distance = getDistance(polyline.getPoints().get(0), polyline.getPoints().get(polyline.getPoints().size() - 1)) / 100;
-        Toast.makeText(this, "Distance = " + distance, Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Polyline Distance = " + distance, Toast.LENGTH_LONG).show();
     }
 
     @Override
     public void onPolygonClick(Polygon polygon) {
         double distance = (getDistance(latLngs.get(0), latLngs.get(1)) + getDistance(latLngs.get(1), latLngs.get(2))
                 + getDistance(latLngs.get(2), latLngs.get(3)) + getDistance(latLngs.get(3), latLngs.get(0))) / 100;
-        Toast.makeText(this, "Distance = " + distance, Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Polygon Distance = " + distance, Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onMarkerDragStart(Marker marker) {
+/*        markerPosition = 0;
+        polyLinePosition = 0;
+        for (int i = 0; i < latLngs.size(); i++) {
+            if (latLngs.get(i).equals(marker.getPosition())) {
+                markerPosition = i;
+            }
+        }
+        for (int i = 0; i < polylines.size(); i++) {
+            if (polylines.get(i).getPoints().get(0).equals(marker.getPosition()) ||
+                    polylines.get(i).getPoints().get(polylines.get(i).getPoints().size() - 1).equals(marker.getPosition())) {
+                polyLinePosition = i;
+                polylines.get(i).remove();
+            }
+        }*/
+    }
+
+    @Override
+    public void onMarkerDrag(Marker marker) {
+
+    }
+
+    @Override
+    public void onMarkerDragEnd(Marker marker) {
+/*        latLngs.set(markerPosition, marker.getPosition());
+        if (latLngs.size() >= markerPosition + 1) {
+            drawLine(latLngs.get(markerPosition - 1), latLngs.get(markerPosition));
+            drawLine(latLngs.get(markerPosition), latLngs.get(markerPosition + 1));
+        }*/
+
+   /*     for (int i = 0; i < polylines.size(); i++) {
+            polylines.get(i).remove();
+        }*/
     }
 
     @Override
     public void onInfoWindowLongClick(Marker marker) {
-        removeMarker(marker);
-        if (latLngs.size() > 0) {
-
-        }
+       /* removeMarker(marker);
+        latLngs.remove(marker.getPosition());
+        for (int i = 0; i < polylines.size(); i++) {
+            polylines.get(i).remove();
+        }*/
     }
+
     private String getTitle(LatLng latLng) {
         try {
             List<Address> listAddresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
@@ -279,13 +308,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 } else if (thoroughfare != null && subThoroughfare != null) {
                     return thoroughfare.concat(", ").concat(subThoroughfare);
                 } else {
-                    return "";
+                    return "Title";
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return "";
+        return "Title";
     }
 
     private String getSnippet(LatLng latLng) {
@@ -301,21 +330,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 } else if (city != null) {
                     return city;
                 } else {
-                    return "";
+                    return "Snippet";
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return "";
+        return "Snippet";
     }
 
     private void addMarker(LatLng latLng) {
+
+        View marker = ((LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE)).inflate(R.layout.view_marker, null);
+        TextView numTxt = (TextView) marker.findViewById(R.id.num_txt);
+        numTxt.setText(title[latLngs.size()]);
+
         mMap.addMarker(new MarkerOptions()
                 .position(latLng)
                 .title(getTitle(latLng))
                 .snippet(getSnippet(latLng))
-                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
+                .draggable(true)
+                .icon(BitmapDescriptorFactory.fromBitmap(createDrawableFromView(this, marker))));
     }
 
     private void removeMarker(Marker marker) {
@@ -329,32 +364,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .width(5)
                 .color(Color.RED);
         Polyline polyline = mMap.addPolyline(polylineOptions);
+        polylines.add(polyline);
         polyline.setClickable(true);
-        this.polylineOptions.add(polylineOptions);
     }
 
     private void drawPolygon() {
         if (latLngs.size() == 4) {
-            mMap.addPolygon(new PolygonOptions()
+            Polygon polygon = mMap.addPolygon(new PolygonOptions()
                     .add(latLngs.get(0), latLngs.get(1), latLngs.get(2), latLngs.get(3))
                     .strokeColor(Color.TRANSPARENT)
-                    .fillColor(getResources().getColor(R.color.transparent_green))).setClickable(true);
+                    .fillColor(getResources().getColor(R.color.transparent_green)));
+            polygon.setClickable(true);
         }
-    }
-
-    private boolean isPolyLineClick(LatLng latLng) {
-        for (PolylineOptions polyline : polylineOptions) {
-            for (LatLng polyCoords : polyline.getPoints()) {
-                float[] results = new float[1];
-                Location.distanceBetween(latLng.latitude, latLng.longitude,
-                        polyCoords.latitude, polyCoords.longitude, results);
-
-                if (results[0] < 100) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private double getDistance(LatLng latLng1, LatLng latLng2) {
@@ -367,5 +388,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         endPoint.setLongitude(latLng2.longitude);
 
         return startPoint.distanceTo(endPoint);
+    }
+
+    public static Bitmap createDrawableFromView(Context context, View view) {
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        ((Activity) context).getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        view.setLayoutParams(new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        view.measure(displayMetrics.widthPixels, displayMetrics.heightPixels);
+        view.layout(0, 0, displayMetrics.widthPixels, displayMetrics.heightPixels);
+        view.buildDrawingCache();
+        Bitmap bitmap = Bitmap.createBitmap(view.getMeasuredWidth(), view.getMeasuredHeight(), Bitmap.Config.ARGB_8888);
+
+        Canvas canvas = new Canvas(bitmap);
+        view.draw(canvas);
+
+        return bitmap;
     }
 }
