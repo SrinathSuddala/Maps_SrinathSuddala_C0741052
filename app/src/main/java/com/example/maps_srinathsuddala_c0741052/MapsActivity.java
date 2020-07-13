@@ -263,4 +263,82 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         }
     }
+    private String getTitle(LatLng latLng) {
+        try {
+            List<Address> listAddresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
+            if (null != listAddresses && listAddresses.size() > 0) {
+                String thoroughfare = listAddresses.get(0).getThoroughfare();
+                String subThoroughfare = listAddresses.get(0).getSubThoroughfare();
+                String postalCode = listAddresses.get(0).getPostalCode();
+                if (thoroughfare != null && subThoroughfare != null && postalCode != null) {
+                    return thoroughfare.concat(", ").concat(subThoroughfare).concat(", ").concat(postalCode);
+                } else if (thoroughfare == null && subThoroughfare != null && postalCode != null) {
+                    return subThoroughfare.concat(", ").concat(postalCode);
+                } else if (thoroughfare != null && subThoroughfare == null && postalCode != null) {
+                    return thoroughfare.concat(", ").concat(postalCode);
+                } else if (thoroughfare != null && subThoroughfare != null) {
+                    return thoroughfare.concat(", ").concat(subThoroughfare);
+                } else {
+                    return "";
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    private String getSnippet(LatLng latLng) {
+        try {
+            List<Address> listAddresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
+            if (null != listAddresses && listAddresses.size() > 0) {
+                String city = listAddresses.get(0).getAddressLine(0);
+                String state = listAddresses.get(0).getAddressLine(1);
+                if (city != null && state != null) {
+                    return city.concat(", ").concat(state);
+                } else if (city == null && state != null) {
+                    return state;
+                } else if (city != null) {
+                    return city;
+                } else {
+                    return "";
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    private void addMarker(LatLng latLng) {
+        mMap.addMarker(new MarkerOptions()
+                .position(latLng)
+                .title(getTitle(latLng))
+                .snippet(getSnippet(latLng))
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
+    }
+
+    private void removeMarker(Marker marker) {
+        marker.remove();
+        latLngs.remove(marker.getPosition());
+    }
+
+    private void drawLine(LatLng latLng1, LatLng latLng2) {
+        PolylineOptions polylineOptions = new PolylineOptions()
+                .add(latLng1, latLng2)
+                .width(5)
+                .color(Color.RED);
+        Polyline polyline = mMap.addPolyline(polylineOptions);
+        polyline.setClickable(true);
+        this.polylineOptions.add(polylineOptions);
+    }
+
+    private void drawPolygon() {
+        if (latLngs.size() == 4) {
+            mMap.addPolygon(new PolygonOptions()
+                    .add(latLngs.get(0), latLngs.get(1), latLngs.get(2), latLngs.get(3))
+                    .strokeColor(Color.TRANSPARENT)
+                    .fillColor(getResources().getColor(R.color.transparent_green)));
+        }
+    }
 
