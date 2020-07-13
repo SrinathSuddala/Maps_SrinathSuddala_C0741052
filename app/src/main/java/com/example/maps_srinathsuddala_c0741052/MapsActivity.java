@@ -338,7 +338,34 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             mMap.addPolygon(new PolygonOptions()
                     .add(latLngs.get(0), latLngs.get(1), latLngs.get(2), latLngs.get(3))
                     .strokeColor(Color.TRANSPARENT)
-                    .fillColor(getResources().getColor(R.color.transparent_green)));
+                    .fillColor(getResources().getColor(R.color.transparent_green))).setClickable(true);
         }
     }
 
+    private boolean isPolyLineClick(LatLng latLng) {
+        for (PolylineOptions polyline : polylineOptions) {
+            for (LatLng polyCoords : polyline.getPoints()) {
+                float[] results = new float[1];
+                Location.distanceBetween(latLng.latitude, latLng.longitude,
+                        polyCoords.latitude, polyCoords.longitude, results);
+
+                if (results[0] < 100) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private double getDistance(LatLng latLng1, LatLng latLng2) {
+        Location startPoint = new Location("locationA");
+        startPoint.setLatitude(latLng1.latitude);
+        startPoint.setLongitude(latLng1.longitude);
+
+        Location endPoint = new Location("locationB");
+        endPoint.setLatitude(latLng2.latitude);
+        endPoint.setLongitude(latLng2.longitude);
+
+        return startPoint.distanceTo(endPoint);
+    }
+}
