@@ -199,4 +199,68 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_LOCATION: {
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    if (ContextCompat.checkSelfPermission(this,
+                            Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        if (mGoogleApiClient == null) {
+                            buildGoogleApiClient();
+                        }
+                        mMap.setMyLocationEnabled(true);
+                    }
+                } else {
+                    Toast.makeText(this, "permission denied",
+                            Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+        }
+    }
+
+    @Override
+    public void onMapClick(LatLng latLng) {
+        if (latLngs.size() < 4) {
+            addMarker(latLng);
+            if (latLngs.size() != 0) {
+                drawLine(latLngs.get(latLngs.size() - 1), latLng);
+            }
+            latLngs.add(latLng);
+            if (latLngs.size() == 4) {
+                drawLine(latLngs.get(0), latLng);
+                drawPolygon();
+            }
+        }
+    }
+
+    @Override
+    public void onMapLongClick(LatLng latLng) {
+
+    }
+
+    @Override
+    public void onPolylineClick(Polyline polyline) {
+        double distance = getDistance(polyline.getPoints().get(0), polyline.getPoints().get(polyline.getPoints().size() - 1)) / 100;
+        Toast.makeText(this, "Distance = " + distance, Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onPolygonClick(Polygon polygon) {
+        double distance = (getDistance(latLngs.get(0), latLngs.get(1)) + getDistance(latLngs.get(1), latLngs.get(2))
+                + getDistance(latLngs.get(2), latLngs.get(3)) + getDistance(latLngs.get(3), latLngs.get(0))) / 100;
+        Toast.makeText(this, "Distance = " + distance, Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onInfoWindowLongClick(Marker marker) {
+        removeMarker(marker);
+        if (latLngs.size() > 0) {
+
+        }
+    }
 
